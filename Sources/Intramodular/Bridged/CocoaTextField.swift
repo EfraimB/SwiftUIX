@@ -44,6 +44,7 @@ public struct CocoaTextField<Label: View>: CocoaView {
         var secureTextEntry: Bool?
         var textColor: UIColor?
         var textContentType: UITextContentType?
+        var cursorTintColor: UIColor?
         
         // MARK: Input Accessory
         
@@ -185,6 +186,7 @@ fileprivate struct _CocoaTextField<Label: View>: UIViewRepresentable {
             uiView.textAlignment = .init(context.environment.multilineTextAlignment)
             uiView.textColor = configuration.textColor ?? uiView.textColor
             uiView.textContentType = configuration.textContentType
+            uiView.tintColor = configuration.cursorTintColor
             
             if let kerning = configuration.kerning {
                 uiView.defaultTextAttributes.updateValue(kerning, forKey: .kern)
@@ -389,6 +391,10 @@ extension CocoaTextField {
     
     public func placeholderTextColor(_ foregroundColor: Color) -> Self {
         then({ $0.configuration.placeholderTextColor = foregroundColor.toUIColor() })
+    }
+    
+    public func cursorTintColor(_ color: Color) -> Self {
+        then({ $0.configuration.cursorTintColor = color.toUIColor() })
     }
     
     public func foregroundColor(_ foregroundColor: Color) -> Self {
