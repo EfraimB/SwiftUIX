@@ -42,13 +42,9 @@ private struct AddKeyboardPadding: ViewModifier {
                 .padding(.bottom, contentPadding)
                 .onReceive(keyboardHeightPublisher, perform: { (keyboardHeight: CGFloat) in
                     if isBasic {
-                        if !isForced {
-                            padding = keyboardHeight > 0.0
-                              ? keyboardHeight - geometry.safeAreaInsets.bottom
-                              : 0.0
-                        } else {
-                            padding = keyboardHeight
-                        }
+                        padding = keyboardHeight > 0.0
+                          ? keyboardHeight - geometry.safeAreaInsets.bottom
+                          : 0.0
                     } else {
                       padding = max(0, min(CGFloat(UIResponder.firstResponder?.globalFrame?.maxY ?? 0.0) - CGFloat((geometry.frame(in: .global).height) - keyboardHeight), keyboardHeight) - geometry.safeAreaInsets.bottom)
                     }
