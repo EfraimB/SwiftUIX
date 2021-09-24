@@ -327,7 +327,7 @@ extension _TextView: UIViewRepresentable {
         
         func textViewDidEndEditing(_ textView: UITextView) {
             configuration.onEditingChanged(false)
-            configuration.onCommit()
+//            configuration.onCommit()
         }
     }
     
@@ -470,6 +470,21 @@ extension TextView: DefaultTextInputType where Label == Text {
         onCommit: @escaping () -> Void = { }
     ) {
         self.label = Text(title).foregroundColor(.placeholderText)
+        self.text = text
+        self.configuration = .init(
+            isConstant: false,
+            onEditingChanged: onEditingChanged,
+            onCommit: onCommit
+        )
+    }
+    
+    public init(
+        label: Label,
+        text: Binding<String>,
+        onEditingChanged: @escaping (Bool) -> Void = { _ in },
+        onCommit: @escaping () -> Void = { }
+    ) {
+        self.label = label
         self.text = text
         self.configuration = .init(
             isConstant: false,

@@ -165,13 +165,10 @@ fileprivate struct _CocoaTextField<Label: View>: UIViewRepresentable {
         uiView.delegate = context.coordinator
         
         if context.environment.isEnabled {
-            DispatchQueue.main.async {
-                if (configuration.isInitialFirstResponder ?? configuration.isFocused?.wrappedValue) ?? false {
-                    uiView.becomeFirstResponder()
-                }
+            if (configuration.isInitialFirstResponder ?? configuration.isFocused?.wrappedValue) ?? false {
+                uiView.becomeFirstResponder()
             }
         }
-
         return uiView
     }
     
