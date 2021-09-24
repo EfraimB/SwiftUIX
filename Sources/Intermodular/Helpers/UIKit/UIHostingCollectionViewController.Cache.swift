@@ -19,12 +19,10 @@ extension UIHostingCollectionViewController {
         private var cellIdentifierToPreferencesMap: [UICollectionViewCellType.Configuration.ID: UICollectionViewCellType.Preferences] = [:]
         private var cellIdentifierToIndexPathMap: [UICollectionViewCellType.Configuration.ID: IndexPath] = [:]
         private var indexPathToCellIdentifierMap: [IndexPath: UICollectionViewCellType.Configuration.ID] = [:]
-        
         private var supplementaryViewIdentifierToCacheMap: [UICollectionViewSupplementaryViewType.Configuration.ID: UICollectionViewSupplementaryViewType.Cache] = [:]
         private var supplementaryViewIdentifierToContentSizeMap: [UICollectionViewSupplementaryViewType.Configuration.ID: CGSize] = [:]
         private var supplementaryViewIdentifierToIndexPathMap: [UICollectionViewSupplementaryViewType.Configuration.ID: IndexPath] = [:]
         private var indexPathToSupplementaryViewContentSizeMap: [String: [IndexPath: CGSize]] = [:]
-        
         private var itemIdentifierHashToIndexPathMap: [Int: IndexPath] = [:]
         
         private let prototypeHeaderView = UICollectionViewSupplementaryViewType()
@@ -193,7 +191,7 @@ extension UIHostingCollectionViewController.Cache {
             
             if oldValue?.relativeFrame != newValue?.relativeFrame {
                 parent.cache.invalidateIndexPath(indexPath)
-                parent.invalidateLayout(includingCache: false)
+                parent.invalidateLayout(includingCache: false, animated: false)
             }
         }
     }
@@ -224,7 +222,7 @@ extension UIHostingCollectionViewController.Cache {
                 
                 if oldValue?.relativeFrame != newValue?.relativeFrame {
                     self.parent.cache.invalidateIndexPath(indexPath)
-                    self.parent.invalidateLayout(includingCache: false)
+                    self.parent.invalidateLayout(includingCache: false, animated: false)
                 }
             }
         )
@@ -247,13 +245,12 @@ extension UIHostingCollectionViewController.Cache {
         
         preconfigure(cell: prototypeCell)
         
-        prototypeCell.update(forced: true)
+        prototypeCell.update(disableAnimation: true)
         prototypeCell.cellWillDisplay(inParent: nil, isPrototype: true)
         
         let size = prototypeCell
             .systemLayoutSizeFitting(UIView.layoutFittingCompressedSize)
-            .rounded(.up)
-            .clamped(to: prototypeCell.configuration?.maximumSize ?? nil)
+            .clamped(to: (prototypeCell.configuration?.maximumSize ?? nil).rounded(.down))
         
         guard !(size.width == 1 && size.height == 1) else {
             return size
@@ -279,13 +276,12 @@ extension UIHostingCollectionViewController.Cache {
         
         preconfigure(cell: prototypeCell)
         
-        prototypeView.update(forced: true)
+        prototypeView.update(disableAnimation: true)
         prototypeView.supplementaryViewWillDisplay(inParent: nil, isPrototype: true)
         
         let size = prototypeView
             .systemLayoutSizeFitting(UIView.layoutFittingCompressedSize)
-            .rounded(.up)
-            .clamped(to: configuration.maximumSize)
+            .clamped(to: configuration.maximumSize?.rounded(.down))
         
         guard !(size.width == 1 && size.height == 1) else {
             return size

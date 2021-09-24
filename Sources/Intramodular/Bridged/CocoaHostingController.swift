@@ -18,7 +18,8 @@ open class CocoaHostingController<Content: View>: AppKitOrUIKitHostingController
         }
     }
     #endif
-    
+    var _isResizingParentWindow: Bool = false
+
     public var mainView: Content {
         get {
             rootView.content
@@ -92,8 +93,8 @@ open class CocoaHostingController<Content: View>: AppKitOrUIKitHostingController
     override open func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         
-        if let window = view.window, window.canResizeToFitContent {
-            window.frame.size = sizeThatFits(in: Screen.main.bounds.size)
+        DispatchQueue.main.async {
+            self.resizeParentWindowIfNecessary()
         }
     }
     
@@ -119,7 +120,6 @@ open class CocoaHostingController<Content: View>: AppKitOrUIKitHostingController
     
     /// https://twitter.com/b3ll/status/1193747288302075906
     public func _fixSafeAreaInsetsIfNecessary() {
-        #if os(iOS) || os(tvOS) || targetEnvironment(macCatalyst)
         defer {
             _safeAreaInsetsAreFixed = true
         }
@@ -127,11 +127,39 @@ open class CocoaHostingController<Content: View>: AppKitOrUIKitHostingController
         guard !_safeAreaInsetsAreFixed else {
             return
         }
+               
+        _fixSafeAreaInsets()
+    }
         
+    private func resizeParentWindowIfNecessary() {
+        guard !_isResizingParentWindow else {
+            return
+        }
+
+        _isResizingParentWindow = true
+        
+        defer {
+            _isResizingParentWindow = false
+        }
+        
+        #if os(iOS)
+        if let window = view.window, window.canResizeToFitContent, view.frame.size.isAreaZero || view.frame.size == Screen.size {
+            _fixSafeAreaInsets()
+            
+            window.frame.size = sizeThatFits(AppKitOrUIKitLayoutSizeProposal(targetSize: Screen.main.bounds.size))
+        }
+        #endif
+    }
+}
+
+extension AppKitOrUIKitHostingController {
+    /// https://twitter.com/b3ll/status/1193747288302075906
+    func _fixSafeAreaInsets() {
+        #if os(iOS) || os(tvOS) || targetEnvironment(macCatalyst)
         guard let viewClass = object_getClass(view) else {
             return
         }
-        
+
         let className = String(cString: class_getName(viewClass)).appending("_SwiftUIX_patched")
         
         if let viewSubclass = NSClassFromString(className) {

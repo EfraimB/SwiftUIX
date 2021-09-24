@@ -24,6 +24,48 @@ open class AppKitOrUIKitHostingWindow<Content: View>: AppKitOrUIKitWindow {
         }
     }
     
+    #if os(iOS)
+    open override var frame: CGRect {
+        get {
+            super.frame
+        } set {
+            guard newValue != frame else {
+                return
+            }
+            
+            super.frame = newValue
+            
+            setWindowOrigin()
+        }
+    }
+    #endif
+             
+    var isKeyAndVisible: Binding<Bool> = .constant(true)
+    
+    var windowPosition: CGPoint? {
+        didSet {
+            #if os(iOS)
+            if oldValue == nil {
+                setWindowOrigin()
+            } else {
+                UIView.animate(withDuration: 0.2) {
+                    self.setWindowOrigin()
+                }
+            }
+            #else
+            setWindowOrigin()
+            #endif
+        }
+    }
+
+    #if os(iOS)
+    override public var isHidden: Bool {
+        didSet {
+            rootHostingViewController.rootView.content.isPresented = !isHidden
+        }
+    }
+    #endif
+    
     #if os(macOS)
     public convenience init(rootView: Content) {
         let contentViewController = CocoaHostingController(mainView: AppKitOrUIKitHostingWindowContent(window: nil, content: rootView))
@@ -51,6 +93,24 @@ open class AppKitOrUIKitHostingWindow<Content: View>: AppKitOrUIKitWindow {
         fatalError("init(coder:) has not been implemented")
     }
     #endif
+    
+    private func setWindowOrigin() {
+        guard let windowPosition = windowPosition else {
+            return
+        }
+
+        let originX = (windowPosition.x - self.frame.size.width / 2)
+        let originY = (windowPosition.y - self.frame.size.height / 2)
+        
+        #if os(iOS)
+            self.frame.origin = .init(
+                x: originX,
+                y: originY
+            )
+        #elseif os(macOS)
+        setFrameOrigin(.init(x: originX, y: originY))
+        #endif
+    }
 }
 
 // MARK: - API -
@@ -80,36 +140,37 @@ final class WindowPositionPreferenceKey: TakeLastPreferenceKey<CGPoint> {
 
 fileprivate struct AppKitOrUIKitHostingWindowContent<Content: View>: View {
     @usableFromInline
-    weak var window: AppKitOrUIKitWindow?
+    weak var window: AppKitOrUIKitHostingWindow<Content>?
     
     @usableFromInline
     var content: Content
     
+    @usableFromInline
+    var isPresented: Bool = false
+    
+    private var presentationManager: _PresentationManager {
+        _PresentationManager(window: window)
+    }
+    
     @inlinable
     public var body: some View {
-        content.onPreferenceChange(WindowPositionPreferenceKey.self) { value in
-            if let window = self.window, let value = value {
-                if window.frame.origin != value {
-                    #if os(macOS)
-                    window.setFrameOrigin(value)
-                    #else
-                    UIView.animate(withDuration: 0.2) {
-                        window.frame.origin = value
-                    }
-                    #endif
+        content
+            .onPreferenceChange(WindowPositionPreferenceKey.self) { windowPosition in
+                if let window = self.window {
+                    window.windowPosition = windowPosition
                 }
             }
-        }
-        .environment(\.presentationManager, _PresentationManager(window: window))
+            .environment(\.presentationManager, presentationManager)
+            .id(isPresented)
     }
     
     @usableFromInline
     struct _PresentationManager: PresentationManager {
         @usableFromInline
-        var window: AppKitOrUIKitWindow?
+        var window: AppKitOrUIKitHostingWindow<Content>?
         
         @usableFromInline
-        init(window: AppKitOrUIKitWindow?) {
+        init(window: AppKitOrUIKitHostingWindow<Content>?) {
             self.window = window
         }
         
@@ -125,6 +186,8 @@ fileprivate struct AppKitOrUIKitHostingWindowContent<Content: View>: View {
             #else
             window?.isHidden = true
             #endif
+            
+            window?.isKeyAndVisible.wrappedValue = false
         }
     }
 }

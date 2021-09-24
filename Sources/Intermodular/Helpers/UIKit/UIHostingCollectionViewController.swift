@@ -37,7 +37,7 @@ final class UIHostingCollectionViewController<
         CellContent
     >
     
-    var dataSource: DataSource? = nil {
+    var dataSource: DataSource.Payload? = nil {
         didSet {
             updateDataSource(oldValue: oldValue, newValue: dataSource)
         }
@@ -86,23 +86,16 @@ final class UIHostingCollectionViewController<
     lazy var dragAndDropDelegate = DragAndDropDelegate(parent: self)
     #endif
     
-    lazy var collectionView: UICollectionView = {
-        let collectionView = UICollectionView(frame: view.bounds, collectionViewLayout: collectionViewLayout._toUICollectionViewLayout())
-        
-        collectionView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        collectionView.backgroundColor = .clear
-        collectionView.backgroundView = UIView()
-        collectionView.backgroundView?.backgroundColor = .clear
-        collectionView.isPrefetchingEnabled = false
-        
-        view.addSubview(collectionView)
+    lazy var collectionView: _UICollectionView = {
+        let collectionView = _UICollectionView(parent: self)
         
         collectionView.delegate = self
-        
         #if !os(tvOS)
         collectionView.dragDelegate = dragAndDropDelegate
         collectionView.dropDelegate = dragAndDropDelegate
         #endif
+        
+        view.addSubview(collectionView)
         
         return collectionView
     }()
@@ -122,6 +115,11 @@ final class UIHostingCollectionViewController<
     public override func viewDidLoad() {
         super.viewDidLoad()
         
+        registerCellAndSupplementaryViewTypes()
+        setupDiffableDataSource()
+    }
+    
+    private func registerCellAndSupplementaryViewTypes() {
         collectionView.register(
             UICollectionViewCellType.self,
             forCellWithReuseIdentifier: .hostingCollectionViewCellIdentifier
@@ -138,7 +136,9 @@ final class UIHostingCollectionViewController<
             forSupplementaryViewOfKind: UICollectionView.elementKindSectionFooter,
             withReuseIdentifier: .hostingCollectionViewSupplementaryViewIdentifier
         )
-        
+    }
+    
+    private func setupDiffableDataSource() {
         let diffableDataSource = UICollectionViewDiffableDataSource<SectionIdentifierType, ItemIdentifierType>(collectionView: collectionView) { [weak self] collectionView, indexPath, sectionIdentifier in
             guard let self = self, self.dataSource != nil else {
                 return nil
@@ -165,7 +165,7 @@ final class UIHostingCollectionViewController<
             
             self.cache.preconfigure(cell: cell)
             
-            cell.update()
+            cell.update(disableAnimation: true)
             
             return cell
         }
@@ -254,21 +254,29 @@ final class UIHostingCollectionViewController<
     override public func viewSafeAreaInsetsDidChange()  {
         super.viewSafeAreaInsetsDidChange()
         
-        invalidateLayout(includingCache: false)
+        invalidateLayout(includingCache: false, animated: true)
     }
     
     public override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
         
-        invalidateLayout(includingCache: true)
+        invalidateLayout(includingCache: true, animated: true)
     }
     
-    public func invalidateLayout(includingCache: Bool) {
+    public func invalidateLayout(includingCache: Bool, animated: Bool) {
         if includingCache {
             cache.invalidate()
         }
         
+        CATransaction.begin()
+        
+        if !animated {
+            CATransaction.setDisableActions(true)
+        }
+        
         collectionView.collectionViewLayout.invalidateLayout()
+        
+        CATransaction.commit()
     }
     
     // MARK: - UICollectionViewDelegate -
@@ -407,6 +415,25 @@ final class UIHostingCollectionViewController<
     
     // MARK: UIScrollViewDelegate
     
+    public func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        let _scrollViewWillBeginDragging_dismissKeyboard = "_scrollViewWillBeginDragging_dismissKeyboard"
+        
+        self.perform(Selector(_scrollViewWillBeginDragging_dismissKeyboard))
+    }
+    
+    @available(macCatalystApplicationExtension, unavailable)
+    @available(iOSApplicationExtension, unavailable)
+    @available(tvOSApplicationExtension, unavailable)
+    @objc(_scrollViewWillBeginDragging_dismissKeyboard) func _scrollViewWillBeginDragging_dismissKeyboard() {
+        #if os(iOS)
+        if #available(iOS 13.0, *) {
+            if _scrollViewConfiguration.keyboardDismissMode == .onDrag {
+                Keyboard.dismiss()
+            }
+        }
+        #endif
+    }
+    
     public func scrollViewDidScroll(_ scrollView: UIScrollView) {
         if let onOffsetChange = _scrollViewConfiguration.onOffsetChange {
             onOffsetChange(scrollView.contentOffset(forContentType: AnyView.self))
@@ -419,46 +446,38 @@ final class UIHostingCollectionViewController<
 }
 
 extension UIHostingCollectionViewController {
-    func refresh() {
-        guard let dataSource = _internalDiffableDataSource else {
-            return
-        }
-        
-        dataSource.apply(dataSource.snapshot(), animatingDifferences: true)
-    }
-    
     func refreshVisibleCellsAndSupplementaryViews() {
-        collectionView.visibleSupplementaryViews(ofKind: UICollectionView.elementKindSectionHeader).forEach { view in
+        for view in collectionView.visibleSupplementaryViews(ofKind: UICollectionView.elementKindSectionHeader) {
             guard let view = view as? UICollectionViewSupplementaryViewType else {
                 return
             }
             
-            view.cache.content = nil
+            view.cache = .init()
             view.configuration?.viewProvider = viewProvider
             
-            view.update(forced: true)
+            view.update(disableAnimation: true)
         }
         
-        collectionView.visibleCells.forEach { cell in
+        for cell in collectionView.visibleCells {
             guard let cell = cell as? UICollectionViewCellType else {
                 return
             }
             
-            cell.cache.content = nil
+            cell.cache = .init()
             cell.configuration?.viewProvider = viewProvider
             
-            cell.update(forced: false)
+            cell.update(disableAnimation: true)
         }
         
-        collectionView.visibleSupplementaryViews(ofKind: UICollectionView.elementKindSectionFooter).forEach { view in
+        for view in collectionView.visibleSupplementaryViews(ofKind: UICollectionView.elementKindSectionFooter) {
             guard let view = view as? UICollectionViewSupplementaryViewType else {
                 return
             }
             
-            view.cache.content = nil
+            view.cache = .init()
             view.configuration?.viewProvider = viewProvider
             
-            view.update(forced: true)
+            view.update(disableAnimation: true)
         }
     }
 }
@@ -511,6 +530,79 @@ extension UIHostingCollectionViewController {
 }
 
 // MARK: - Auxiliary Implementation -
+
+extension UIHostingCollectionViewController {
+    class _UICollectionView: UICollectionView, UICollectionViewDelegateFlowLayout {
+        weak var parent: UIHostingCollectionViewController?
+        
+        init(parent: UIHostingCollectionViewController) {
+            self.parent = parent
+            
+            super.init(
+                frame: parent.view.bounds,
+                collectionViewLayout: parent.collectionViewLayout._toUICollectionViewLayout()
+            )
+            
+            autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            backgroundColor = .clear
+            backgroundView = UIView()
+            backgroundView?.backgroundColor = .clear
+            isPrefetchingEnabled = false
+        }
+        
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+        
+        func collectionView(
+            _ collectionView: UICollectionView,
+            layout collectionViewLayout: UICollectionViewLayout,
+            sizeForItemAt indexPath: IndexPath
+        ) -> CGSize {
+            guard let parent = parent else {
+                return UICollectionViewFlowLayout.automaticSize
+            }
+            
+            return parent.collectionView(
+                self,
+                layout: collectionViewLayout,
+                sizeForItemAt: indexPath
+            )
+        }
+        
+        func collectionView(
+            _ collectionView: UICollectionView,
+            layout collectionViewLayout: UICollectionViewLayout,
+            referenceSizeForHeaderInSection section: Int
+        ) -> CGSize {
+            guard let parent = parent else {
+                return UICollectionViewFlowLayout.automaticSize
+            }
+            
+            return parent.collectionView(
+                self,
+                layout: collectionViewLayout,
+                referenceSizeForHeaderInSection: section
+            )
+        }
+        
+        func collectionView(
+            _ collectionView: UICollectionView,
+            layout collectionViewLayout: UICollectionViewLayout,
+            referenceSizeForFooterInSection section: Int
+        ) -> CGSize {
+            guard let parent = parent else {
+                return UICollectionViewFlowLayout.automaticSize
+            }
+            
+            return parent.collectionView(
+                self,
+                layout: collectionViewLayout,
+                referenceSizeForFooterInSection: section
+            )
+        }
+    }
+}
 
 fileprivate extension Dictionary where Key == Int, Value == [Int: CGSize] {
     subscript(_ indexPath: IndexPath) -> CGSize? {

@@ -33,13 +33,30 @@ struct WindowOverlay<Content: View>: AppKitOrUIKitViewControllerRepresentable {
         viewController.content = content
         
         viewController.updateWindow()
+        
+        #if os(iOS)
+        if let window = viewController.contentWindow {
+            let userInterfaceStyle: UIUserInterfaceStyle = context.environment.colorScheme == .light ? .light : .dark
+            
+            if window.overrideUserInterfaceStyle != userInterfaceStyle {
+                window.overrideUserInterfaceStyle = userInterfaceStyle
+                window.rootViewController?.overrideUserInterfaceStyle = userInterfaceStyle
+            }
+        }
+        #endif
     }
     
     @usableFromInline
     static func dismantleAppKitOrUIKitViewController(_ viewController: AppKitOrUIKitViewControllerType, coordinator: Coordinator) {
-        viewController.isKeyAndVisible.wrappedValue = false
-        viewController.updateWindow()
-        viewController.contentWindow = nil
+        DispatchQueue.asyncOnMainIfNecessary {
+            _withoutAnimation_AppKitOrUIKit {
+                if viewController.contentWindow != nil {
+                    viewController.isKeyAndVisible.wrappedValue = false
+                    viewController.updateWindow()
+                    viewController.contentWindow = nil
+                }
+            }
+        }
     }
 }
 
@@ -109,6 +126,7 @@ extension WindowOverlay {
                 #endif
                 
                 contentWindow.rootView = content
+                contentWindow.isKeyAndVisible = isKeyAndVisible
                 
                 #if os(macOS)
                 contentWindow.title = ""
@@ -120,6 +138,8 @@ extension WindowOverlay {
                 contentWindow.windowLevel = .init(rawValue: window.windowLevel.rawValue + 1)
                 
                 contentWindow.makeKeyAndVisible()
+                
+                contentWindow.rootViewController?.view.setNeedsDisplay()
                 #endif
             } else {
                 #if os(macOS)
@@ -127,10 +147,11 @@ extension WindowOverlay {
                 #else
                 contentWindow?.isHidden = true
                 contentWindow?.isUserInteractionEnabled = false
+                contentWindow = nil
                 #endif
             }
         }
-                
+        
         @usableFromInline
         @objc required dynamic init?(coder aDecoder: NSCoder) {
             fatalError("init(coder:) has not been implemented")
