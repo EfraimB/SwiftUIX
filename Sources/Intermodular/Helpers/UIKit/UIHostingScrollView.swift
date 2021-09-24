@@ -94,7 +94,6 @@ open class UIHostingScrollView<Content: View>: UIScrollView, _opaque_UIHostingSc
                     self.update()
                 }
             }
-            
             return
         }
         

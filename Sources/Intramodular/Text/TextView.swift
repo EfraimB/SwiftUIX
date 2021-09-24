@@ -185,6 +185,10 @@ extension _TextView: UIViewRepresentable {
                 uiView.textColor = textColor
             }
             
+            if let tintColor = context.environment.tintColor?.toUIColor() {
+                uiView.tintColor = tintColor
+            }
+            
             if let linkForegroundColor = configuration.linkForegroundColor {
                 uiView.linkTextAttributes[.foregroundColor] = linkForegroundColor
             } else {
