@@ -131,7 +131,7 @@ extension _TextView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: UIViewType, context: Context) {
-        _withoutAnimation_AppKitOrUIKit(context.transaction.isAnimated) {
+        _withoutAppKitOrUIKitAnimation(context.transaction.isAnimated) {
             if let uiView = uiView as? UIHostingTextView<Label> {
                 uiView._isSwiftUIRuntimeUpdateActive = true
                 
@@ -306,6 +306,10 @@ extension _TextView: UIViewRepresentable {
         }
         
         func textViewDidChange(_ textView: UITextView) {
+            if let textView = textView as? UIHostingTextView<Label>, textView._isSwiftUIRuntimeDismantled {
+                return
+            }
+            
             if let text = text {
                 text.wrappedValue = textView.text
             } else {
