@@ -291,7 +291,7 @@ public class UIHostingTableViewController<SectionModel: Identifiable, ItemType: 
         
         let height = prototypeCell
             .contentHostingController
-            .sizeThatFits(in: UIView.layoutFittingExpandedSize)
+            .sizeThatFits(in: CGSize(width: tableView.bounds.width, height: 0))
             .height
         
         _rowContentHeightCache[item.id] = height
