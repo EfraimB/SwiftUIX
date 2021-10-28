@@ -27,6 +27,7 @@ public struct TextView<Label: View>: View {
         #endif
         var font: AppKitOrUIKitFont?
         var textColor: AppKitOrUIKitColor?
+		var tintColor: AppKitOrUIKitColor?
         var kerning: CGFloat?
         var linkForegroundColor: AppKitOrUIKitColor?
         var textContainerInset: AppKitOrUIKitInsets = .zero
@@ -184,6 +185,10 @@ extension _TextView: UIViewRepresentable {
             if let textColor = configuration.textColor {
                 uiView.textColor = textColor
             }
+			
+			if let tintColor = configuration.tintColor {
+				uiView.tintColor = tintColor
+			}
             
             if let tintColor = context.environment.tintColor?.toUIColor() {
                 uiView.tintColor = tintColor
@@ -419,6 +424,9 @@ extension _TextView: NSViewRepresentable {
         }
         
         nsView.textColor = configuration.textColor
+		if let tintColor = configuration.tintColor {
+			nsView.insertionPointColor = tintColor
+		}
     }
 }
 
@@ -553,6 +561,10 @@ extension TextView {
     public func foregroundColor(_ foregroundColor: Color) -> Self {
         then({ $0.configuration.textColor = foregroundColor.toUIColor() })
     }
+	
+	public func tint(_ tint: Color) -> Self {
+		then({ $0.configuration.tintColor = tint.toUIColor() })
+	}
     
     public func linkForegroundColor(_ linkForegroundColor: Color?) -> Self {
         then({ $0.configuration.linkForegroundColor = linkForegroundColor?.toUIColor() })
@@ -568,6 +580,11 @@ extension TextView {
     public func foregroundColor(_ foregroundColor: AppKitOrUIKitColor) -> Self {
         then({ $0.configuration.textColor = foregroundColor })
     }
+	
+	@_disfavoredOverload
+	public func tint(_ tint: AppKitOrUIKitColor) -> Self {
+		then({ $0.configuration.tintColor = tint })
+	}
     
     public func kerning(_ kerning: CGFloat) -> Self {
         then({ $0.configuration.kerning = kerning })
