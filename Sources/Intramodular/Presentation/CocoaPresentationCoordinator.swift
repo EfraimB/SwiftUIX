@@ -120,19 +120,31 @@ extension CocoaPresentationCoordinator: DynamicViewPresenter {
         guard let viewController = viewController else {
             return
         }
-        
+                
         #if os(iOS) || os(tvOS) || targetEnvironment(macCatalyst)
-        if let presentedViewController = viewController.presentedViewController as? CocoaPresentationHostingController, presentedViewController.modalViewPresentationStyle == modal.content.modalPresentationStyle {
-            presentedViewController.presentation = modal
+        guard !viewController.isBeingPresented else {
             return
         }
         
-        let viewControllerToBePresented = CocoaPresentationHostingController(
-            presentingViewController: viewController,
-            presentation: modal,
-            coordinator: .init(presentation: modal)
-        )
+        if let presentedViewController = viewController.presentedViewController as? CocoaPresentationHostingController, presentedViewController.modalViewPresentationStyle == modal.content.modalPresentationStyle {
+            
+            presentedViewController.presentation = modal
+            
+            return
+        }
+                
+        let viewControllerToBePresented: UIViewController
         
+        if case let .appKitOrUIKitViewController(viewController) = modal.content.base {
+            viewControllerToBePresented = viewController
+        } else {
+            viewControllerToBePresented = CocoaPresentationHostingController(
+                presentingViewController: viewController,
+                presentation: modal,
+                coordinator: .init(presentation: modal)
+            )
+        }
+                
         viewController.present(
             viewControllerToBePresented,
             animated: true
@@ -196,9 +208,29 @@ extension CocoaPresentationCoordinator: DynamicViewPresenter {
     }
     
     func update(with value: AnyModalPresentation.PreferenceKeyValue) {
-        if let presentation = value.presentation {
+        if
+            let currentPresentation = presentation,
+            let newPresentation = value.presentation,
+            currentPresentation.id == newPresentation.id || currentPresentation.id == value.presentationID
+        {
+            #if os(iOS) || os(tvOS) || targetEnvironment(macCatalyst)
+            if let viewController = viewController as? CocoaPresentationHostingController, !viewController.isBeingPresented {
+                viewController.presentation = newPresentation
+            }
+            
+            return
+            #elseif os(macOS)
+            fatalError("unimplemented")
+            #endif
+        } else if let presentation = value.presentation {
             present(presentation, completion: { })
-        } else if let presentedCoordinator = presentedCoordinator, let presentation = presentedCoordinator.presentation, value.presentationID == presentation.id {
+        } else if
+            let presentedCoordinator = presentedCoordinator,
+            let presentation = presentedCoordinator.presentation,
+            value.presentationID == presentation.id
+        {
+            dismiss()
+        } else if presentedCoordinator != nil {
             dismiss()
         }
     }
@@ -296,6 +328,7 @@ struct _UseCocoaPresentationCoordinator: ViewModifier {
     
     func body(content: Content) -> some View {
         content
+            .environment(\.cocoaPresentationCoordinator, coordinator)
             .environment(\.presenter, coordinator?.presentingCoordinator)
             .environment(\.presentationManager, CocoaPresentationMode(coordinator: presentationCoordinatorBox))
             .onPreferenceChange(_NamedViewDescription.PreferenceKey.self, perform: {
@@ -321,6 +354,20 @@ struct _UseCocoaPresentationCoordinator: ViewModifier {
             }
             .preference(key: AnyModalPresentation.PreferenceKey.self, value: nil)
             .preference(key: _DismissDisabled.self, value: false)
+    }
+}
+
+extension EnvironmentValues {
+    struct CocoaPresentationCoordinatorKey: EnvironmentKey {
+        static let defaultValue: CocoaPresentationCoordinator? = nil
+    }
+    
+    var cocoaPresentationCoordinator: CocoaPresentationCoordinator? {
+        get {
+            self[CocoaPresentationCoordinatorKey.self]
+        } set {
+            self[CocoaPresentationCoordinatorKey.self] = newValue
+        }
     }
 }
 

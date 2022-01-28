@@ -132,7 +132,7 @@ extension _TextView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: UIViewType, context: Context) {
-        _withoutAppKitOrUIKitAnimation(context.transaction.isAnimated) {
+        _withoutAppKitOrUIKitAnimation(context.transaction.animation == nil) {
             if let uiView = uiView as? UIHostingTextView<Label> {
                 uiView._isSwiftUIRuntimeUpdateActive = true
                 
@@ -183,11 +183,11 @@ extension _TextView: UIViewRepresentable {
             let font: UIFont = configuration.font ?? context.environment.font?.toUIFont() ?? .preferredFont(forTextStyle: .body)
             
             if let textColor = configuration.textColor {
-                uiView.textColor = textColor
+                assignIfNotEqual(textColor, to: &uiView.textColor)
             }
 			
 			if let tintColor = configuration.tintColor {
-				uiView.tintColor = tintColor
+                assignIfNotEqual(tintColor, to: &uiView.tintColor)
 			}
             
             if let tintColor = context.environment.tintColor?.toUIColor() {
@@ -195,7 +195,7 @@ extension _TextView: UIViewRepresentable {
             }
             
             if let linkForegroundColor = configuration.linkForegroundColor {
-                uiView.linkTextAttributes[.foregroundColor] = linkForegroundColor
+                assignIfNotEqual(linkForegroundColor, to: &uiView.linkTextAttributes[.foregroundColor])
             } else {
                 if uiView.linkTextAttributes[.foregroundColor] != nil {
                     uiView.linkTextAttributes[.foregroundColor] = nil
@@ -215,10 +215,10 @@ extension _TextView: UIViewRepresentable {
             
             if requiresAttributedText {
                 let paragraphStyle = NSMutableParagraphStyle()
-                
-                paragraphStyle.lineBreakMode = context.environment.lineBreakMode
-                paragraphStyle.lineSpacing = context.environment.lineSpacing
-                
+
+                assignIfNotEqual(context.environment.lineBreakMode, to: &paragraphStyle.lineBreakMode)
+                assignIfNotEqual(context.environment.lineSpacing, to: &paragraphStyle.lineSpacing)
+
                 context.environment._paragraphSpacing.map {
                     paragraphStyle.paragraphSpacing = $0
                 }
@@ -230,11 +230,11 @@ extension _TextView: UIViewRepresentable {
                     ]
                     
                     if let kerning = configuration.kerning {
-                        attributes[.kern] = kerning
+                        assignIfNotEqual(kerning, to: &attributes[.kern])
                     }
                     
                     if let textColor = configuration.textColor {
-                        attributes[.foregroundColor] = textColor
+                        assignIfNotEqual(textColor, to: &attributes[.foregroundColor])
                     }
                     
                     uiView.attributedText = NSAttributedString(
@@ -254,10 +254,16 @@ extension _TextView: UIViewRepresentable {
         }
         
         correctCursorOffset: do {
-            // Reset the cursor offset if possible.
+            #if os(tvOS)
             if let cursorOffset = cursorOffset, let position = uiView.position(from: uiView.beginningOfDocument, offset: cursorOffset), let textRange = uiView.textRange(from: position, to: position) {
                 uiView.selectedTextRange = textRange
             }
+            #else
+            // Reset the cursor offset if possible.
+            if uiView.isEditable, let cursorOffset = cursorOffset, let position = uiView.position(from: uiView.beginningOfDocument, offset: cursorOffset), let textRange = uiView.textRange(from: position, to: position) {
+                uiView.selectedTextRange = textRange
+            }
+            #endif
         }
         
         updateKeyboardConfiguration: do {

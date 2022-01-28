@@ -189,7 +189,7 @@ open class UIHostingScrollView<Content: View>: UIScrollView, _opaque_UIHostingSc
         }
     }
     
-    // MARK: - UIScrollViewDelegate -
+    // MARK: - UIScrollViewDelegate 
     
     public func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         guard !_isUpdating else {

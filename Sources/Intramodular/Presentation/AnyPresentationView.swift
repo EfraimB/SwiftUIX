@@ -7,9 +7,16 @@ import Swift
 import SwiftUI
 
 public struct AnyPresentationView: View {
-    public let base: _opaque_View
+    enum Base {
+        case native(AnyView)
+        #if !os(watchOS)
+        case appKitOrUIKitViewController(AppKitOrUIKitViewController)
+        #endif
+    }
     
-    private var environmentBuilder: EnvironmentBuilder
+    var base: Base
+    
+    var environmentBuilder: EnvironmentBuilder = .init()
     
     public private(set) var name: AnyHashable?
     public private(set) var id: AnyHashable?
@@ -19,20 +26,41 @@ public struct AnyPresentationView: View {
     public private(set) var hidesBottomBarWhenPushed: Bool = false
     
     public var body: some View {
-        base
-            .eraseToAnyView()
-            .mergeEnvironmentBuilder(environmentBuilder)
-            .modifier(_ResolveAppKitOrUIKitViewController())
+        PassthroughView {
+            switch base {
+                case .native(let view):
+                    view
+                        .mergeEnvironmentBuilder(environmentBuilder)
+                        .modifier(_ResolveAppKitOrUIKitViewController())
+                #if !os(watchOS)
+                case .appKitOrUIKitViewController(let viewController):
+                    AppKitOrUIKitViewControllerAdaptor(viewController)
+                        .mergeEnvironmentBuilder(environmentBuilder)
+                        .modifier(_ResolveAppKitOrUIKitViewController(viewController))
+                #endif
+            }
+        }
     }
     
     public init<V: View>(_ view: V) {
         if let view = view as? AnyPresentationView {
             self = view
         } else {
-            self.base = (view as? _opaque_View) ?? view.eraseToAnyView()
-            self.environmentBuilder = .init()
+            self.base = .native((view as? _opaque_View)?.eraseToAnyView() ?? view.eraseToAnyView())
         }
     }
+    
+    #if !os(watchOS)
+    public init(_ viewController: AppKitOrUIKitViewController) {
+        self.base = .appKitOrUIKitViewController(viewController)
+
+        #if os(iOS)
+        if let transitioningDelegate = viewController.transitioningDelegate {
+            self = self.modalPresentationStyle(.custom(transitioningDelegate))
+        }
+        #endif
+    }
+    #endif
 }
 
 // MARK: - Conformances -

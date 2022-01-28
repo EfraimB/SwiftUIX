@@ -7,12 +7,16 @@ import SwiftUI
 
 var _areAnimationsDisabledGlobally: Bool = false
 
-public func _withoutAnimation(_ flag: Bool = true, _ body: () -> ()) {
+public func _withoutAnimation<T>(_ flag: Bool = true, _ body: () -> T) -> T {
     guard flag else {
         return body()
     }
-    
-    withAnimation(.none) {
+
+    var transaction = Transaction(animation: .none)
+
+    transaction.disablesAnimations = true
+
+    return withTransaction(transaction) {
         body()
     }
 }
@@ -23,10 +27,9 @@ public func _withoutAppKitOrUIKitAnimation(_ flag: Bool = true, _ body: () -> ()
     }
     
     #if os(iOS)
-    CATransaction.begin()
-    CATransaction.setDisableActions(true)
-    body()
-    CATransaction.commit()
+    UIView.performWithoutAnimation {
+        body()
+    }
     #else
     body()
     #endif
@@ -40,7 +43,7 @@ public func withoutAnimation(_ flag: Bool = true, _ body: () -> ()) {
     
     _areAnimationsDisabledGlobally = true
     
-    withAnimation(.none) {
+    _withoutAnimation {
         body()
     }
     

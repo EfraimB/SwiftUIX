@@ -49,10 +49,11 @@ struct WindowOverlay<Content: View>: AppKitOrUIKitViewControllerRepresentable {
     @usableFromInline
     static func dismantleAppKitOrUIKitViewController(_ viewController: AppKitOrUIKitViewControllerType, coordinator: Coordinator) {
         DispatchQueue.asyncOnMainIfNecessary {
-            _withoutAppKitOrUIKitAnimation {
-                if viewController.contentWindow != nil {
-                    viewController.contentWindow = nil
-                }
+            if let contentWindow = viewController.contentWindow {
+                #if os(iOS)
+                contentWindow.isHidden = true
+                #endif
+                viewController.contentWindow = nil
             }
         }
     }
@@ -140,13 +141,17 @@ extension WindowOverlay {
                 contentWindow.rootViewController?.view.setNeedsDisplay()
                 #endif
             } else {
-                #if os(macOS)
-                contentWindow?.close()
-                #else
-                contentWindow?.isHidden = true
-                contentWindow?.isUserInteractionEnabled = false
-                contentWindow = nil
-                #endif
+                if let contentWindow = contentWindow {
+                    #if os(macOS)
+                    contentWindow.close()
+                    #else
+                    contentWindow.isHidden = true
+                    contentWindow.isUserInteractionEnabled = false
+                    contentWindow.windowScene = nil
+
+                    self.contentWindow = nil
+                    #endif
+                }
             }
         }
         

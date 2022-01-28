@@ -7,7 +7,9 @@ import SwiftUI
 
 #if os(iOS) || os(macOS) || os(tvOS) || targetEnvironment(macCatalyst)
 
+@MainActor
 public protocol AppKitOrUIKitHostingControllerProtocol: AppKitOrUIKitViewController {
+    @MainActor
     func sizeThatFits(in _: CGSize) -> CGSize
 }
 
@@ -31,16 +33,23 @@ extension NSHostingController: AppKitOrUIKitHostingControllerProtocol {
 
 #if os(iOS) || os(macOS) || os(tvOS) || targetEnvironment(macCatalyst)
 
+@MainActor
 extension AppKitOrUIKitHostingControllerProtocol {
     public func sizeThatFits(_ sizeProposal: AppKitOrUIKitLayoutSizeProposal) -> CGSize {
         let targetSize = sizeProposal.appKitOrUIKitTargetSize
         let fittingSize = sizeProposal.appKitOrUIKitFittingSize
-        
+
         guard sizeProposal.allowsSelfSizing else {
             return targetSize
         }
-        
-        _withoutAppKitOrUIKitAnimation {
+
+        if #available(iOS 15.0, *) {
+            #if os(iOS) || os(tvOS) || targetEnvironment(macCatalyst)
+            view.layoutIfNeeded()
+            #elseif os(macOS)
+            view.layout()
+            #endif
+        } else {
             #if os(iOS) || os(tvOS) || targetEnvironment(macCatalyst)
             view.setNeedsLayout()
             view.layoutIfNeeded()
@@ -48,9 +57,9 @@ extension AppKitOrUIKitHostingControllerProtocol {
             view.layout()
             #endif
         }
-        
-        var result = sizeThatFits(in: fittingSize)
-        
+
+        var result: CGSize = sizeThatFits(in: fittingSize)
+
         switch (result.width, result.height)  {
             case (AppKitOrUIKitView.layoutFittingExpandedSize.width, AppKitOrUIKitView.layoutFittingExpandedSize.height), (.greatestFiniteMagnitude, .greatestFiniteMagnitude), (.infinity, .infinity):
                 result = sizeThatFits(in: targetSize.clamped(to: sizeProposal.maximumSize))
@@ -74,7 +83,7 @@ extension AppKitOrUIKitHostingControllerProtocol {
             default:
                 break
         }
-        
+
         result = CGSize(
             width: sizeProposal.horizontalFittingPriority == .required
                 ? targetSize.width
@@ -83,22 +92,22 @@ extension AppKitOrUIKitHostingControllerProtocol {
                 ? targetSize.height
                 : result.height
         )
-        
+
         if result.width.isZero && !result.height.isZero {
             result = .init(width: 1, height: result.height)
         } else if !result.width.isZero && result.height.isZero {
             result = .init(width: result.width, height: 1)
         }
-        
+
         return result.clamped(to: sizeProposal.maximumSize)
     }
-    
+
     public func sizeThatFits(
         in size: CGSize,
         withHorizontalFittingPriority horizontalFittingPriority: AppKitOrUIKitLayoutPriority? = nil,
         verticalFittingPriority: AppKitOrUIKitLayoutPriority? = nil
     ) -> CGSize {
-        return sizeThatFits(
+        sizeThatFits(
             .init(
                 targetSize: .init(size),
                 horizontalFittingPriority: horizontalFittingPriority,
@@ -159,11 +168,11 @@ public struct AppKitOrUIKitLayoutSizeProposal {
     
     var appKitOrUIKitFittingSize: CGSize {
         let width = horizontalFittingPriority == .required
-            ? targetSize.clamping(to: maximumSize).width ?? AppKitOrUIKitView.layoutFittingCompressedSize.width
+            ? targetSize.clamped(to: maximumSize).width ?? AppKitOrUIKitView.layoutFittingCompressedSize.width
             : (maximumSize.width ?? AppKitOrUIKitView.layoutFittingExpandedSize.width)
         
         let height = verticalFittingPriority == .required
-            ? targetSize.clamping(to: maximumSize).height ?? AppKitOrUIKitView.layoutFittingCompressedSize.height
+            ? targetSize.clamped(to: maximumSize).height ?? AppKitOrUIKitView.layoutFittingCompressedSize.height
             : (maximumSize.height ?? AppKitOrUIKitView.layoutFittingExpandedSize.height)
         
         return CGSize(width: width, height: height)

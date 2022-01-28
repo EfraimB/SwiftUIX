@@ -16,7 +16,7 @@ extension UIHostingCollectionViewController: _CollectionViewProxyBase {
     
     var maximumCollectionViewCellSize: OptionalDimensions {
         var baseContentSize = collectionView.contentSize
-        
+
         if let collectionViewLayout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout {
             if collectionViewLayout.scrollDirection == .vertical {
                 if baseContentSize.width == 0, collectionView.frame.width > 0 {
@@ -39,14 +39,14 @@ extension UIHostingCollectionViewController: _CollectionViewProxyBase {
             height: max(floor(contentSize.height - 0.001), 0)
         )
         
-        if result.width == 0 {
+        if !_scrollViewConfiguration.axes.contains(.vertical) || result.width == 0 {
             result.width = AppKitOrUIKitView.layoutFittingExpandedSize.width
         }
         
-        if result.height == 0 {
+        if !_scrollViewConfiguration.axes.contains(.horizontal) || result.height == 0 {
             result.height = AppKitOrUIKitView.layoutFittingExpandedSize.height
         }
-        
+                
         return result
     }
     
